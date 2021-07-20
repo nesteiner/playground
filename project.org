@@ -1,0 +1,13 @@
+#+export_file_name: README.md
+#+publishing-function: org-markdown-export-to-markdown
+#+toc:nil section-numbers:nil
+#+title: PlayGround
+
+* Program
+** [[file:./flatten_dir.py][flatten_dir]]
+*** 介绍
+将嵌套目录内的所有文件转移到某个目录
+*** 用法
+#+begin_src python
+  python3 flatten_dir.py --from dirname --to dirname --method copy/move
+#+end_src
