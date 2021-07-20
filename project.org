@@ -1,10 +1,11 @@
 #+export_file_name: README.md
 #+publishing-function: org-markdown-export-to-markdown
-#+toc:nil section-numbers:nil
+#+options: toc:nil section-numbers:nil
 #+title: PlayGround
 
 * Program
-** [[file:./flatten_dir.py][flatten_dir]]
+** flatten dir
+[[file:./flatten_dir.py][flatten dir]]
 *** 介绍
 将嵌套目录内的所有文件转移到某个目录
 *** 用法
