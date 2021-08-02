@@ -12,3 +12,32 @@
 #+begin_src python
   python3 flatten_dir.py --from dirname --to dirname --method copy/move
 #+end_src
+
+* Exploring
+** Rust 安全并发
+[[https://www.jianshu.com/p/a4bc33022aa3][tutorial]]
+*** 知识点
+1. 多线程
+2. 异步
+
+*** Processing
+**** 1. 线程管理
+**** 2. 线程同步
+**** 3. 异步并发
+
+
+** Rust 构造健壮的程序
+*** 需求
+1. 断言
+2. Option
+3. Result
+4. Panic
+
+*** 实践 待定
+- Julia 能写吗
+- C/C++ 能写吗
+
+* Clojure Simple Project
+** Random function
+[[file:./random-clojure-function][project dir]]
+command line application that displays a random function from the Clojure standard library
