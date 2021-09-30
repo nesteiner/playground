@@ -14,154 +14,119 @@
 #+end_src
 
 
-** C++ list 制作新方式
-[[file:./listcpp][goto project]]
+** 链表制作新方式 written in Julia
+[[file:list.jl][goto project]]
 *** 说明
-链表其实我写过好多次了，最近发现现代语言有种保证运行安全的方法，叫做 *一切皆类型*
-刚好 Julia 语言就是这么一个实现，有人已经类型安全，避开使用空值来实现链表，这里我想用 C++ 试一试
+这是最近写出来的一个链表，使用的是 *一切皆类型*
+另外上个版本的 =C++= 链表文档我删了，懒得弄
+这里用 =Julia= 写一个精简的链表
 *** 设计
-首先定义 抽象类/接口类 listnode , 并分发出三个子类 nullnode, dummynode, datanode， 分别重写接口的方法
-这样以后，可以通过 listnode * 调用抽象类方法来实现 *多态*
-#+begin_src c++
-  class listnode {
-  public:
-    virtual listnode * next_node() = 0;
-    virtual void insert_next(listnode * pnode) = 0;
-    virtual bool isnull() = 0;
-    virtual int getdata() = 0;
+首先为链表节点抽象出三个类型
+- =ListNode= 表示最基本的链表节点类型
+- =ListNext <: ListNode= 表示拥有 =next= 成员的节点类型
+- =ListCons <: ListNext= 表示拥有 =data= 及 =next= 成员的节点类型
 
-  };
+这三个类型各有其接口
+#+begin_src julia
+  next(node::ListNext) = node.next
+  data(node::ListCons) = node.data
+  insert_next!(node::ListNext, next::ListNode) = node.next = next
 #+end_src
 
-#+begin_src c++
-  class nullnode : public listnode {
-  public:
-    nullnode() {}
+再由这三个类型派发出三种节点
+- =Nil=
+- =Dummy=
+- =Cons=
 
-  public:
-    listnode * next_node() {
-      throw implException("next node is not implied for nullnode type");
-    }
+#+begin_src julia
+  abstract type ListNode end
+  abstract type ListNext <: ListNode end
+  abstract type ListCons <: ListNext end
 
-    void insert_next(listnode * node) {
-      throw implException("insert_next is not implied for nullnode type");
-    }
+  mutable struct Nil <: ListNode
 
+  end
 
-    bool isnull() { return true; }
+  mutable struct Dummy <: ListNext
+    next::ListNode
 
-    int getdata() {
-      throw implException("getdata is not implied for nullnode type");
-    }
-  };
+    Dummy() = new(Nil())
+  end
 
-  class dummynode : public listnode {
-  private:
-    listnode * pnext;
+  mutable struct Cons <: ListCons
+    data::Int
+    next::ListNode
 
-  public:
-    dummynode(listnode * pnode): pnext(pnode) {}
-
-  public:
-    listnode * next_node() { return pnext; }
-
-    void insert_next(listnode * pnode) { pnext = pnode; }
-
-    bool isnull() { return false; }
-
-    int getdata() {
-      throw implException("getdata is not implied for dummynode type");
-    }
-  };
-
-  class datanode : public listnode {
-  private:
-    int data;
-    listnode * pnext;
-
-  public:
-    datanode(int _data, listnode * _pnext) : data(_data), pnext(_pnext) {}
-
-  public:
-    listnode * next_node() { return pnext; }
-
-    void insert_next(listnode * pnode) { pnext = pnode; }
-
-    bool isnull() { return false; }
-
-    int getdata() { return data; }
-  };
-
+    Cons(data::Int) = new(data, Nil())
+  end
 #+end_src
 
-*注意*
-如果使用 Rust 中的枚举类型来描述 listnode 下的子类，应该更为合理
-
-*** 链表定义
-链表节点的插入会用到 哨兵节点，也就是 dummynode 类型
-另外要额外定义一个 nullnode 对象来表示 *空指针*
-#+begin_src c++
-  static nullnode null = nullnode();
+*** 链表实现
+在链表中的定义
+#+begin_src julia
+  mutable struct List
+    dummy::Dummy
+    current::ListNode
+  end
 #+end_src
 
-
-#+begin_src c++
-  class list {
-  private:
-    listnode * phead;
-    listnode * ptail;
-
-  public:
-    list() {
-      phead = ptail = new dummynode(&null);
-    }
-
-    ~list() {
-      listnode * pnode = phead;
-      listnode * prev = nullptr;
-      while(!pnode -> isnull()) {
-        prev = pnode;
-        pnode = pnode -> next_node();
-
-        delete prev;
-      }
-    }
-
-  public:
-    void push(int data) {
-      datanode * pnode = new datanode(data, &null);
-      ptail -> insert_next(pnode);
-      ptail = ptail -> next_node();
-    }
-
-    friend ostream &operator<<(ostream &os, list &lst) {
-      listnode * pnode = lst.phead -> next_node();
-      while (!pnode -> isnull()) {
-        os << pnode -> getdata() << ' ';
-        pnode = pnode -> next_node();
-      }
-      return os;
-    }
-  };
-
-#+end_src
-*** 测试实例
-#+begin_src c++
-  int main() {
-    list lst;
-    for(int i = 0; i <= 10; i += 1) {
-      lst.push(i);
-    }
-
-    cout << lst << endl;
-    return 0;
-  }
+=current= 节点表示可以遍历链表所有节点的游标节点，用 =ListNode= 抽象类型表示所有节点类型
+这样在内部的构造函数可以定义为
+#+begin_src julia
+  List() = begin
+    list = new()
+    list.current = list.dummy = Dummy()
+    return list
+  end
 #+end_src
 
-运行结果
-#+begin_quote
-0 1 2 3 4 5 6 7 8 9 10
-#+end_quote
+接下来操作节点需要用到运行时类型
+#+begin_src julia
+  function iterate(list::List)
+    firstnode = next(list.dummy)
+    if isa(firstnode, Nil)
+      return nothing
+    else
+      return data(firstnode), next(firstnode)
+    end
+  end
+
+  function iterate(list::List, state::ListNode)
+    if isa(state, Nil)
+      return nothing
+    else
+      return data(state), next(state)
+    end
+  end
+
+  function push!(list::List, data::Int)
+    newnode = Cons(data)
+    unlink = next(list.current)
+    insert_next!(newnode, unlink)
+    insert_next!(list.current, newnode)
+    list.current = next(list.current)
+  end
+#+end_src
+
+这里尝试下一个测试案例
+#+begin_src julia
+  function show(io::IO, list::List)
+    print(io, "list: ")
+    for value in list
+      print(io, value, ' ')
+    end
+  end
+
+  function test()
+    list = List()
+    for i in 1:10
+      push!(list, i)
+    end
+
+    println(list)
+  end
+#+end_src
+
 * Clojure Simple Project
 ** Random function
 [[file:./random-clojure-function][project dir]]
@@ -172,11 +137,27 @@ Encoding and decoding messages with Clacks
 我也不知道干什么使的，好像是灯语
 
 
-* Julia Data Structures
+* Data Structure & Algorithm, using Julia
 ** LinkedList
 [[file:./list.jl][goto project]]
 单链表结构，使用类型设计表达节点
+** 图 - 邻接表实现
+[[file:graphcpp/][goto project]]
 
+*** 内部结构
+
+*** 接口
+
+*** 实现算法
+
+** 二叉树 - 以二叉搜索树为例
+[[file:treecpp/][goto project]]
+
+*** 内部结构
+
+*** 接口
+
+*** 实现算法
 
 * Titanic
 [[https://nesteiner.github.io/ChiniBlogs/html/titanic.html][read the doc]]
@@ -231,7 +212,7 @@ I need to use pipeline and some model to transform in *one step*
 
 *** 模型训练
 - use LogisticClassifier
-  
+
 *** 生产环境调试
 - 模型优化
 - 图像查看产出结果
@@ -242,3 +223,5 @@ I need to use pipeline and some model to transform in *one step*
 
 * Lab
 [[file:./lab6b.jl][Ridge and Lasso regression]]
+
+

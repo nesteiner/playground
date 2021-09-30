@@ -5,12 +5,12 @@
 
 ## flatten dir
 
-[goto project](./flatten_dir.py)  
+[goto project](./flatten_dir.py)
 
 
 ### 介绍
 
-将嵌套目录内的所有文件转移到某个目录  
+将嵌套目录内的所有文件转移到某个目录
 
 
 ### 用法
@@ -18,154 +18,122 @@
     python3 flatten_dir.py --from dirname --to dirname --method copy/move
 
 
-## C++ list 制作新方式
+## 链表制作新方式 written in Julia
 
-[goto project](./listcpp)  
+[goto project](list.jl)
 
 
 ### 说明
 
-链表其实我写过好多次了，最近发现现代语言有种保证运行安全的方法，叫做 **一切皆类型**  
-刚好 Julia 语言就是这么一个实现，有人已经类型安全，避开使用空值来实现链表，这里我想用 C++ 试一试  
+这是最近写出来的一个链表，使用的是 **一切皆类型**
+另外上个版本的 `C++` 链表文档我删了，懒得弄
+这里用 `Julia` 写一个精简的链表
 
 
 ### 设计
 
-首先定义 抽象类/接口类 listnode , 并分发出三个子类 nullnode, dummynode, datanode， 分别重写接口的方法  
-这样以后，可以通过 listnode \* 调用抽象类方法来实现 **多态**  
+首先为链表节点抽象出三个类型
 
-    class listnode {
-    public:
-      virtual listnode * next_node() = 0;
-      virtual void insert_next(listnode * pnode) = 0;
-      virtual bool isnull() = 0;
-      virtual int getdata() = 0;
-    
-    };
+-   `ListNode` 表示最基本的链表节点类型
+-   `ListNext <: ListNode` 表示拥有 `next` 成员的节点类型
+-   `ListCons <: ListNext` 表示拥有 `data` 及 `next` 成员的节点类型
 
-    class nullnode : public listnode {
-    public:
-      nullnode() {}
-    
-    public:
-      listnode * next_node() {
-        throw implException("next node is not implied for nullnode type");
-      }
-    
-      void insert_next(listnode * node) {
-        throw implException("insert_next is not implied for nullnode type");
-      }
-    
-    
-      bool isnull() { return true; }
-    
-      int getdata() {
-        throw implException("getdata is not implied for nullnode type");
-      }
-    };
-    
-    class dummynode : public listnode {
-    private:
-      listnode * pnext;
-    
-    public:
-      dummynode(listnode * pnode): pnext(pnode) {}
-    
-    public:
-      listnode * next_node() { return pnext; }
-    
-      void insert_next(listnode * pnode) { pnext = pnode; }
-    
-      bool isnull() { return false; }
-    
-      int getdata() {
-        throw implException("getdata is not implied for dummynode type");
-      }
-    };
-    
-    class datanode : public listnode {
-    private:
-      int data;
-      listnode * pnext;
-    
-    public:
-      datanode(int _data, listnode * _pnext) : data(_data), pnext(_pnext) {}
-    
-    public:
-      listnode * next_node() { return pnext; }
-    
-      void insert_next(listnode * pnode) { pnext = pnode; }
-    
-      bool isnull() { return false; }
-    
-      int getdata() { return data; }
-    };
+这三个类型各有其接口
 
-**注意**  
-如果使用 Rust 中的枚举类型来描述 listnode 下的子类，应该更为合理  
+    next(node::ListNext) = node.next
+    data(node::ListCons) = node.data
+    insert_next!(node::ListNext, next::ListNode) = node.next = next
+
+再由这三个类型派发出三种节点
+
+-   `Nil`
+-   `Dummy`
+-   `Cons`
+
+    abstract type ListNode end
+    abstract type ListNext <: ListNode end
+    abstract type ListCons <: ListNext end
+    
+    mutable struct Nil <: ListNode
+    
+    end
+    
+    mutable struct Dummy <: ListNext
+      next::ListNode
+    
+      Dummy() = new(Nil())
+    end
+    
+    mutable struct Cons <: ListCons
+      data::Int
+      next::ListNode
+    
+      Cons(data::Int) = new(data, Nil())
+    end
 
 
-### 链表定义
+### 链表实现
 
-链表节点的插入会用到 哨兵节点，也就是 dummynode 类型  
-另外要额外定义一个 nullnode 对象来表示 **空指针**  
+在链表中的定义
 
-    static nullnode null = nullnode();
+    mutable struct List
+      dummy::Dummy
+      current::ListNode
+    end
 
-    class list {
-    private:
-      listnode * phead;
-      listnode * ptail;
+`current` 节点表示可以遍历链表所有节点的游标节点，用 `ListNode` 抽象类型表示所有节点类型
+这样在内部的构造函数可以定义为
+
+    List() = begin
+      list = new()
+      list.current = list.dummy = Dummy()
+      return list
+    end
+
+接下来操作节点需要用到运行时类型
+
+    function iterate(list::List)
+      firstnode = next(list.dummy)
+      if isa(firstnode, Nil)
+        return nothing
+      else
+        return data(firstnode), next(firstnode)
+      end
+    end
     
-    public:
-      list() {
-        phead = ptail = new dummynode(&null);
-      }
+    function iterate(list::List, state::ListNode)
+      if isa(state, Nil)
+        return nothing
+      else
+        return data(state), next(state)
+      end
+    end
     
-      ~list() {
-        listnode * pnode = phead;
-        listnode * prev = nullptr;
-        while(!pnode -> isnull()) {
-          prev = pnode;
-          pnode = pnode -> next_node();
+    function push!(list::List, data::Int)
+      newnode = Cons(data)
+      unlink = next(list.current)
+      insert_next!(newnode, unlink)
+      insert_next!(list.current, newnode)
+      list.current = next(list.current)
+    end
+
+这里尝试下一个测试案例
+
+    function show(io::IO, list::List)
+      print(io, "list: ")
+      for value in list
+        print(io, value, ' ')
+      end
+    end
     
-          delete prev;
-        }
-      }
+    function test()
+      list = List()
+      for i in 1:10
+        push!(list, i)
+      end
     
-    public:
-      void push(int data) {
-        datanode * pnode = new datanode(data, &null);
-        ptail -> insert_next(pnode);
-        ptail = ptail -> next_node();
-      }
-    
-      friend ostream &operator<<(ostream &os, list &lst) {
-        listnode * pnode = lst.phead -> next_node();
-        while (!pnode -> isnull()) {
-          os << pnode -> getdata() << ' ';
-          pnode = pnode -> next_node();
-        }
-        return os;
-      }
-    };
-
-
-### 测试实例
-
-    int main() {
-      list lst;
-      for(int i = 0; i <= 10; i += 1) {
-        lst.push(i);
-      }
-    
-      cout << lst << endl;
-      return 0;
-    }
-
-运行结果  
-
-> 0 1 2 3 4 5 6 7 8 9 10  
+      println(list)
+    end
 
 
 # Clojure Simple Project
@@ -173,29 +141,57 @@
 
 ## Random function
 
-[project dir](./random-clojure-function)  
-command line application that displays a random function from the Clojure standard library  
+[project dir](./random-clojure-function)
+command line application that displays a random function from the Clojure standard library
 
 
 ## Clacks
 
-[project dir](./cla)  
-Encoding and decoding messages with Clacks  
-我也不知道干什么使的，好像是灯语  
+[project dir](./cla)
+Encoding and decoding messages with Clacks
+我也不知道干什么使的，好像是灯语
 
 
-# Julia Data Structures
+# Data Structure & Algorithm, using Julia
 
 
 ## LinkedList
 
-[goto project](./list.jl)  
-单链表结构，使用类型设计表达节点  
+[goto project](./list.jl)
+单链表结构，使用类型设计表达节点
+
+
+## 图 - 邻接表实现
+
+[goto project](graphcpp/)
+
+
+### 内部结构
+
+
+### 接口
+
+
+### 实现算法
+
+
+## 二叉树 - 以二叉搜索树为例
+
+[goto project](treecpp/)
+
+
+### 内部结构
+
+
+### 接口
+
+
+### 实现算法
 
 
 # Titanic
 
-[read the doc](https://nesteiner.github.io/ChiniBlogs/html/titanic.html)  
+[read the doc](https://nesteiner.github.io/ChiniBlogs/html/titanic.html)
 
 
 ## 数据探索
@@ -215,27 +211,27 @@ Encoding and decoding messages with Clacks
 
 1.  feature<sub>a</sub>
 
-    -   **说明**  
+    -   **说明**
         -   女性以及12岁以下儿童
         -   12岁以上男性
-    -   **字段类型**  
+    -   **字段类型**
         -   String
-    -   **字段值**  
+    -   **字段值**
         -   A
         -   B
     
-    -   注意  
+    -   注意
         -   舍弃 Age 与 Sex
 
 2.  feature<sub>b</sub>
 
-    -   说明  
+    -   说明
         -   家庭人员数量
-    -   相关字段  
+    -   相关字段
         -   SibSp
         -   Parch
     
-    -   注意  
+    -   注意
         -   舍弃 SibSp 与 Parch
 
 
@@ -251,7 +247,7 @@ Encoding and decoding messages with Clacks
 
 ### use MLJ pipeline
 
-I need to use pipeline and some model to transform in **one step**  
+I need to use pipeline and some model to transform in **one step**
 
 
 ### TODO something I forgot
@@ -283,5 +279,5 @@ I need to use pipeline and some model to transform in **one step**
 
 # Lab
 
-[Ridge and Lasso regression](./lab6b.jl)  
+[Ridge and Lasso regression](./lab6b.jl)
 
