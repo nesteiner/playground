@@ -50,6 +50,7 @@
 -   `Dummy`
 -   `Cons`
 
+	```julia
     abstract type ListNode end
     abstract type ListNext <: ListNode end
     abstract type ListCons <: ListNext end
@@ -70,7 +71,7 @@
     
       Cons(data::Int) = new(data, Nil())
     end
-
+```
 
 ### 链表实现
 

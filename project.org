@@ -59,6 +59,7 @@
 
     Cons(data::Int) = new(data, Nil())
   end
+
 #+end_src
 
 *** 链表实现
